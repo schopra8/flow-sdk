@@ -1,0 +1,150 @@
+# -----------------------------------------------------------------------------
+# JINJA/YAML TEMPLATE FILE FOR STARTUP SCRIPTS
+# -----------------------------------------------------------------------------
+# Each key in "templates" is a separate Jinja template snippet that can be
+# injected into the final startup script. The Python side passes a context
+# dictionary to fill in parameters (e.g., "port_mappings", "ephemeral_mounts",
+# or "mount_points").
+# -----------------------------------------------------------------------------
+
+templates:
+
+  port_forwarding_segment: |
+    {% raw %}
+    echo "=== Configuring Port Forwarding and Nginx ==="
+    sudo DEBIAN_FRONTEND=noninteractive apt-get update
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nginx
+    sudo systemctl enable nginx
+
+    echo "=== Generating Self-Signed SSL Certificate ==="
+    sudo mkdir -p /etc/ssl/private
+    sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+      -keyout /etc/ssl/private/myserver.key \
+      -out /etc/ssl/certs/myserver.crt \
+      -subj '/CN=localhost'
+
+    # Disable strict host key checking for foundrypf
+    sudo sed -i '/ssh -i $sshKey -nNT -R $port:localhost:$port ubuntu@$bastionHost -p 2222/s/$/ -o StrictHostKeyChecking=no/' /usr/local/bin/foundrypf
+
+    {% for (external_port, internal_port) in port_mappings %}
+    echo "=== Setting up foundrypf for external port {{external_port}} => internal port {{internal_port}} ==="
+    sudo bash -c "cat <<EOF > /etc/systemd/system/foundrypf_{{internal_port}}.service
+    [Unit]
+    Description=Foundry Port Forwarding Service for port {{internal_port}}
+    After=network.target
+    Wants=network-online.target
+
+    [Service]
+    Type=simple
+    User=root
+    ExecStart=/usr/local/bin/foundrypf {{internal_port}}
+    Restart=always
+    RestartSec=3
+
+    [Install]
+    WantedBy=multi-user.target
+    EOF"
+    sudo systemctl daemon-reload
+    sudo systemctl enable foundrypf_{{internal_port}}.service
+    sudo systemctl start foundrypf_{{internal_port}}.service
+
+    echo "=== Creating Nginx config for external port {{external_port}} => internal port {{internal_port}} ==="
+    sudo bash -c "cat <<EOF > /etc/nginx/sites-available/port_{{external_port}}_ssl
+    server {
+        listen {{external_port}} ssl;
+        listen [::]:{{external_port}} ssl;
+        server_name _;
+        ssl_certificate /etc/ssl/certs/myserver.crt;
+        ssl_certificate_key /etc/ssl/private/myserver.key;
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers HIGH:!aNULL:!MD5;
+
+        location / {
+            proxy_pass http://localhost:{{internal_port}};
+            proxy_set_header Host \$host;
+            proxy_set_header X-Real-IP \$remote_addr;
+            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto \$scheme;
+        }
+    }
+    EOF"
+    sudo ln -sf /etc/nginx/sites-available/port_{{external_port}}_ssl /etc/nginx/sites-enabled/
+    {% endfor %}
+
+    echo "=== Restarting Nginx to Apply Port Forwarding Changes ==="
+    sudo systemctl restart nginx
+    {% endraw %}
+
+
+  ephemeral_storage_segment: |
+    {% raw %}
+    echo "=== Configuring Ephemeral Storage ==="
+    # The ephemeral_mounts dictionary is expected to be: {src_path: dst_path}.
+    # Adjust logic as needed for your ephemeral storage approach.
+
+    {% for src, dst in ephemeral_mounts.items() %}
+    echo "Mounting ephemeral storage from '{{src}}' to '{{dst}}' (user-defined logic)."
+    # Example: create the destination directory
+    sudo mkdir -p "{{dst}}"
+    # You can adapt this to your ephemeral approach, e.g. symlinks, bind mounts, etc.
+    sudo mount --bind "{{src}}" "{{dst}}"
+    echo "Mounted ephemeral storage from '{{src}}' to '{{dst}}'."
+    {% endfor %}
+    {% endraw %}
+
+
+  persistent_storage_segment: |
+    {% raw %}
+    echo "=== Configuring Persistent Storage ==="
+    DISK_DEVS=($(lsblk -dpno NAME,TYPE | grep 'disk' | awk '{print $1}'))
+    echo "Disk devices found: ${DISK_DEVS[@]}"
+
+    MOUNT_POINTS=({{ mount_points | join(' ') }})
+
+    if [ "${#DISK_DEVS[@]}" -ne "${#MOUNT_POINTS[@]}" ]; then
+        echo "ERROR: The number of disks (${#DISK_DEVS[@]}) does not match the number of mount points (${#MOUNT_POINTS[@]})."
+        exit 1
+    fi
+
+    i=0
+    for dev in "${DISK_DEVS[@]}"; do
+        mp="${MOUNT_POINTS[$i]}"
+        echo "Formatting and mounting $dev at $mp"
+        sudo mkdir -p "$mp"
+        sudo mkfs.ext4 -F "$dev"
+        sudo mount "$dev" "$mp"
+        sudo chown -R $USER:$USER "$mp"
+        UUID=$(sudo blkid -s UUID -o value "$dev")
+        echo "UUID=$UUID $mp ext4 defaults 0 2" | sudo tee -a /etc/fstab
+        ((i++))
+    done
+    {% endraw %}
+
+
+# -----------------------------------------------------------------------------
+# BOOTSTRAP SCRIPT TEMPLATE
+# -----------------------------------------------------------------------------
+# This template generates a small bootstrap script that handles the decoding
+# and execution of a larger, compressed and base64-encoded startup script.
+# The 'encoded_script' variable will be passed from the Python code.
+# -----------------------------------------------------------------------------
+
+  bootstrap_script_segment: |
+    {% raw %}
+    #!/bin/bash
+    set -e
+    echo "=== Bootstrapping Large Startup Script ==="
+
+    # Write the base64-encoded script to a temporary file
+    cat << 'EOF_COMPRESSED' > /tmp/encoded_script.b64
+    {{ encoded_script }}
+    EOF_COMPRESSED
+
+    # Decode, decompress, and execute
+    echo "=== Decoding and Decompressing ==="
+    base64 -d /tmp/encoded_script.b64 | gunzip -c > /tmp/full_script.sh
+    chmod +x /tmp/full_script.sh
+
+    echo "=== Executing Full Startup Script ==="
+    /tmp/full_script.sh
+    {% endraw %}

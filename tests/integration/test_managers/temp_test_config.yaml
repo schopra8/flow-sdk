@@ -1,0 +1,37 @@
+name: foundry-flow-example-batch-task-test-469
+persistent_storage:
+  create:
+    disk_interface: Block
+    mount_point: /mnt/my-new-volume
+    region_id: us-central1-a
+    size: 1
+    size_unit: gb
+    storage_type: block
+    volume_name: testdisk-20250114111654-yxlw
+ports:
+- 8080
+- 6006-6010
+- external: 8441
+  internal: 8001
+- external: 8442
+  internal: 8002
+- external: 8443-8445
+  internal: 8003-8005
+resources_specification:
+  fcp_instance: fh1.xlarge
+  gpu_type: NVIDIA A100
+  num_gpus: 1
+  num_instances: 1
+startup_script: '#!/bin/bash
+
+  echo "Starting setup..."
+
+  pip install -r requirements.txt
+
+  echo "Setup complete."
+
+  '
+task_management:
+  priority: low
+  utility_threshold_price: 2.24
+version: 1

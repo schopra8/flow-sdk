@@ -1,0 +1,9 @@
+parameterized==0.9.0
+pydantic==2.10.4
+pytest==8.3.3
+python_json_logger==2.0.7
+PyYAML==6.0.2
+Requests==2.32.3
+responses==0.25.3
+rich==13.9.4
+setuptools==75.2.0

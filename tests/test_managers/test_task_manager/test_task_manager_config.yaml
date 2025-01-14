@@ -1,0 +1,21 @@
+name: test_task_integration_{{ random_suffix }}
+num_instances: 1
+task_management:
+  priority: standard
+  utility_threshold_price: 5.0
+  num_instances: 1
+resources_specification:
+  fcp_instance: test-instance
+  num_instances: 1
+  gpu_type: NVIDIA A100
+  num_gpus: 1
+persistent_storage:
+  create:
+    volume_name: test-volume
+    size: 10
+    disk_interface: Block
+    region_id: test-region
+    size_unit: gb
+startup_script: |
+  #!/bin/bash
+  echo "Hello World"

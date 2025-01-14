@@ -1,0 +1,33 @@
+[project]
+name = "foundry_flow"
+version = "0.1.0"
+description = "SDK and Task CLI for Foundry FCP"
+
+authors = [
+    { name = "", email = "" },
+]
+
+dependencies = [
+    "parameterized==0.9.0",
+    "pydantic==2.10.4",
+    "pydantic-settings>=2.0,<3.0",
+    "pytest==8.3.3",
+    "python-json-logger==2.0.7",
+    "PyYAML==6.0.2",
+    "Requests==2.32.3",
+    "responses==0.25.3",
+    "rich==13.9.4",
+    "setuptools==75.2.0",
+    "jupyter==1.0.0"
+]
+
+requires-python = ">=3.11"
+readme = "README.md"
+license = { text = "APACHE 2.0" }
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm]
+distribution = true
