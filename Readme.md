@@ -31,16 +31,6 @@ Note, we have yet to tune the CLI/ to be more ergonomic and stylish. More work t
 
 # FCP Hierarchical Structures and Ergonomic Improvements 
 
-### Preaamble
-It was not the intention that most developers would interact with the base auction structures. 
-
-The fact they are willing to do so at any non-neglible scale is inspiring, frankly. The early user willingness is strong evidence of the importance of economics for this class of users. 
-
-Our intention is that these auction mechanisms would define the base structures, which Foundry itself and power-user FinOps leads would primarily use, whilst most external users use hierarchical and convenience structures to submit jobs and associated requests. 
-
-
-Here, I want to kickstart some practitioner-centric UX focus threads. In particular, we need to improve the simplicity of using our CLI/API to request and manage resources in Foundry. 
-
 ## FCP convenience taxonomy
 
 A **task** is an atomic, irreducible unit that maps to an all-or-nothing _request_ for infrastructure from FCP. 
